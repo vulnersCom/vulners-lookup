@@ -1,0 +1,428 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap");
+
+.vulners-cve-highlight {
+  background: #ff8b61;
+  color: #ffffff !important;
+  padding: 3px 8px;
+  border-radius: 16px;
+  font-weight: 600;
+  display: inline-block;
+  transition: all 0.2s ease;
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI Variable Text",
+    "Segoe UI",
+    "Inter",
+    "Roboto",
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+  font-size: inherit;
+  line-height: 1.2;
+  position: relative;
+  text-decoration: none !important;
+  box-shadow: 0 2px 8px rgba(255, 139, 97, 0.3);
+}
+
+.vulners-cve-highlight:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 139, 97, 0.4);
+  background: #d92e7f;
+}
+
+.vulners-tooltip {
+  position: absolute;
+  z-index: 2147483647;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 12px;
+  gap: 10px;
+  width: 300px;
+  min-height: 200px;
+  background: #ffffff;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
+  font-family:
+    "Google Sans",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  box-shadow:
+    0 4px 16px rgba(60, 64, 67, 0.15),
+    0 1px 6px rgba(60, 64, 67, 0.1);
+  transition: box-shadow 0.2s ease;
+}
+
+.vulners-tooltip-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0px;
+  gap: 12px;
+  width: 100%;
+  flex: 1;
+  order: 0;
+  align-self: stretch;
+}
+
+.vulners-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 0px 0px 8px 0px;
+  gap: 8px;
+  width: 100%;
+  border-bottom: 1px solid #f1f3f4;
+  flex: none;
+  order: 0;
+  align-self: stretch;
+}
+
+.vulners-logo {
+  width: 16px;
+  height: 16px;
+  border-radius: 40px;
+  flex: none;
+  order: 0;
+  flex-grow: 0;
+}
+
+.vulners-title {
+  width: auto;
+  min-width: 83px;
+  font-family:
+    "Google Sans",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: #5f6368;
+  flex: none;
+  order: 1;
+  white-space: nowrap;
+}
+
+.vulners-main-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: flex-start;
+  padding: 0px;
+  gap: 10px;
+  width: 100%;
+  flex: 1;
+  order: 1;
+  align-self: stretch;
+}
+
+.vulners-cve-title {
+  width: 100%;
+  font-family:
+    "Google Sans",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  flex: none;
+  color: #1a0dab;
+  margin-bottom: 4px;
+  cursor: pointer;
+}
+
+.vulners-cve-title:hover {
+  text-decoration: underline;
+}
+
+.vulners-published {
+  font-family:
+    "Google Sans",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  font-size: 10px;
+  color: #5F5F5F;
+}
+
+.vulners-cve-title-wrapper {
+  margin-bottom: 6px;
+  order: 0;
+}
+
+.vulners-description {
+  width: 100%;
+  font-family:
+    "Google Sans",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  color: #5f6368;
+  flex: 1;
+  order: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  margin-bottom: 10px;
+}
+
+.vulners-chips {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  align-content: flex-start;
+  padding: 0px;
+  gap: 8px;
+  width: 100%;
+  flex: none;
+  order: 2;
+  margin-bottom: 10px;
+}
+
+.vulners-chip {
+  display: inline-flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 4px 10px;
+  height: auto;
+  background: #f8f9fa;
+  border: 1px solid #e8eaed;
+  border-radius: 16px;
+  flex: none;
+  transition: background-color 0.1s ease;
+}
+
+.vulners-chip-value {
+  font-family:
+    "Google Sans",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: #202124;
+  flex: none;
+  order: 0;
+}
+
+.vulners-chip-label {
+  font-family:
+    "Google Sans",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: #5f6368;
+  flex: none;
+  order: 1;
+  margin-left: 4px;
+}
+
+.vulners-stats {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 8px 0px 0px 0px;
+  gap: 8px;
+  width: 100%;
+  border-top: 1px solid #f1f3f4;
+  flex: none;
+  order: 3;
+}
+
+.vulners-stat-card {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-start;
+  align-items: center;
+  padding: 4px 0px;
+  gap: 6px;
+  background: transparent;
+  flex: 1;
+  min-width: 0;
+}
+
+.vulners-stat-card.vulners-wild {
+  justify-content: flex-start;
+  max-width: 35px;
+  min-width: 30px;
+  padding: 2px 0px;
+}
+
+.vulners-stat-icon {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  order: 0;
+  opacity: 0.8;
+}
+
+.vulners-wild .vulners-stat-icon {
+  width: 12px;
+  height: 12px;
+}
+
+.vulners-stat-count {
+  font-family:
+    "Google Sans",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: #202124;
+  flex: none;
+  order: 1;
+  margin-right: 2px;
+}
+
+.vulners-stat-label {
+  font-family:
+    "Google Sans",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: #5f6368;
+  flex: none;
+  order: 2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vulners-wild .vulners-stat-count {
+  color: #ea4335;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.vulners-wild .vulners-stat-label {
+  color: #ea4335;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  line-height: 1;
+}
+
+.vulners-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  gap: 16px;
+}
+
+.vulners-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(142, 142, 142, 0.2);
+  border-top-color: #ff8b61;
+  border-radius: 50%;
+  animation: vulners-spin 0.8s linear infinite;
+}
+
+@keyframes vulners-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.vulners-loading span {
+  font-size: 14px;
+  color: #8e8e8e;
+  font-weight: 500;
+}
+
+@media (max-width: 480px) {
+  .vulners-tooltip {
+    width: 280px;
+    min-height: 180px;
+    padding: 10px;
+  }
+
+  .vulners-stats {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .vulners-stat-card {
+    min-width: 60px;
+    flex: 1;
+  }
+}
+
+.vulners-chip:hover {
+  background: #f1f3f4;
+}
+
+.vulners-tooltip:hover {
+  box-shadow:
+    0 6px 20px rgba(60, 64, 67, 0.18),
+    0 2px 8px rgba(60, 64, 67, 0.12);
+}

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vulners Lookup</title>
+  <link rel="stylesheet" href="dist/popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <div class="header">
+      <img class="logo" src="assets/icon-48.png" alt="Vulners Lookup Logo" />
+      <h1>Vulners Lookup</h1>
+    </div>
+    <div class="stats">
+      <div class="stat-item">
+        <span class="stat-label">CVEs Found:</span>
+        <span id="cve-count" class="stat-value">0</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Status:</span>
+        <span id="status" class="stat-value status-active">Active</span>
+      </div>
+    </div>
+    <div class="controls">
+      <label class="toggle">
+        <input type="checkbox" id="toggle-highlighting" checked>
+        <span class="slider"></span>
+        <span class="label">Enable Highlighting</span>
+      </label>
+    </div>
+    <div class="footer">
+      <a href="https://vulners.com" target="_blank" class="powered-by">
+        Powered by Vulners.com
+      </a>
+    </div>
+  </div>
+  <script src="dist/popup.js"></script>
+</body>
+</html>
