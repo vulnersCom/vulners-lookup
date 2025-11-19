@@ -19,7 +19,9 @@
     "lint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" \"tests/**/*.ts\" --fix",
     "format": "prettier --write \"src/**/*.{ts,css}\" \"tests/**/*.ts\" \"docs/**/*.css\"",
-    "format:check": "prettier --check \"src/**/*.{ts,css}\" \"tests/**/*.ts\" \"docs/**/*.css\""
+    "format:check": "prettier --check \"src/**/*.{ts,css}\" \"tests/**/*.ts\" \"docs/**/*.css\"",
+    "build:chrome": "cp manifest.chrome.json manifest.json && npm run build:prod",
+    "build:firefox": "cp manifest.firefox.json manifest.json && npm run build:prod"
   },
   "devDependencies": {
     "@eslint/js": "^9.34.0",
