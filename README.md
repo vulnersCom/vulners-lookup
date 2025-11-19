@@ -1,41 +1,50 @@
-![Demo](https://i.imgur.com/WIPOBav.png)
+# Vulners Lookup – Chrome & Firefox builds
 
-# ⚡️ Vulners Lookup for Chrome
+This project has been prepared for both Chrome and Firefox Manifest V3.
 
-Chrome extension that highlights CVE identifiers and displays critical information directly on any webpage. No need to navigate elsewhere.
+## Build for Chrome
 
-## 🔧 Features
+```bash
+npm install
+npm run build:chrome
+```
 
-- CVE highlighting on any webpage
-- Hover tooltips showing:
-  - Brief description
-  - Available exploits
-  - CVSS score
-  - EPSS score
-  - Vulners AI Score
-  - Exploited in the wild status
-  - References
-- Click for details: Full analysis on Vulners ✅
+This will:
+- copy `manifest.chrome.json` to `manifest.json`
+- run the normal production build
+- create a `build/` directory with the Chrome-ready extension
 
-## 🛠 Installation from ZIP
+## Build for Firefox
 
-1. Extract the ZIP file
-2. Open chrome://extensions/ → enable Developer mode
-3. Click Load unpacked and select the extension folder
+```bash
+npm install
+npm run build:firefox
+```
 
-## 💡 Key Benefits
+This will:
+- copy `manifest.firefox.json` to `manifest.json`
+- run the normal production build
+- create a `build/` directory with the Firefox-ready extension
 
-- Free to use
-- No registration required
-- Works on any website
-- Instant vulnerability information
+To load the Firefox build temporarily:
 
-## 🐛 Bug Reports & Feature Requests
+1. Open `about:debugging#/runtime/this-firefox`
+2. Click **"Load Temporary Add-on..."**
+3. Select the `manifest.json` file from the `build/` folder
 
-Found a bug or have an idea? Please provide:
-- URL where the issue occurred
-- Screenshot of the problem
+## AMO (addons.mozilla.org) signing
 
----
+To distribute the Firefox build:
 
-*Stay informed about vulnerabilities without leaving your current webpage.*
+1. Make sure `manifest.firefox.json` has a stable, unique `browser_specific_settings.gecko.id`.
+2. Build with `npm run build:firefox`.
+3. Zip the contents of the `build/` folder:
+   ```bash
+   cd build
+   zip -r ../vulners-lookup-firefox-build.zip .
+   ```
+4. Upload that ZIP to AMO for signing.
+
+The `src/api.ts` helper provides a cross-browser API object (`api`) that maps to
+`browser` in Firefox and to `chrome` in Chrome, if you decide to adopt it in the
+codebase.
