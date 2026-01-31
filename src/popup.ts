@@ -1,3 +1,5 @@
+import { isVulnersSite } from './utils';
+
 class PopupController {
   private toggleHighlighting: HTMLInputElement;
   private cveCountElement: HTMLElement;
@@ -33,7 +35,7 @@ class PopupController {
       });
 
       // Prevent enabling on vulners.com
-      if (tab.url && this.isVulnersSite(tab.url)) {
+      if (tab.url && isVulnersSite(tab.url)) {
         this.toggleHighlighting.checked = false;
         return;
       }
@@ -68,7 +70,7 @@ class PopupController {
       });
 
       // Check if we're on vulners.com
-      if (tab.url && this.isVulnersSite(tab.url)) {
+      if (tab.url && isVulnersSite(tab.url)) {
         this.cveCountElement.textContent = '—';
         this.statusElement.textContent = 'Disabled on Vulners';
         this.statusElement.className = 'stat-value status-inactive';
@@ -80,25 +82,32 @@ class PopupController {
       if (tab.id) {
         chrome.tabs.sendMessage(tab.id, { action: 'getStats' }, (response) => {
           if (response && response.count !== undefined) {
-            this.cveCountElement.textContent = response.count.toString();
+            const { count, typeCounts } = response;
+
+            // Show total or breakdown based on type counts
+            if (
+              typeCounts &&
+              (typeCounts.advisory > 0 || typeCounts.exploit > 0)
+            ) {
+              const parts: string[] = [];
+              if (typeCounts.cve > 0) {
+                parts.push(`${typeCounts.cve} CVE`);
+              }
+              if (typeCounts.advisory > 0) {
+                parts.push(`${typeCounts.advisory} Adv`);
+              }
+              if (typeCounts.exploit > 0) {
+                parts.push(`${typeCounts.exploit} Exp`);
+              }
+              this.cveCountElement.textContent = parts.join(' | ') || '0';
+            } else {
+              this.cveCountElement.textContent = count.toString();
+            }
           }
         });
       }
     } catch (error) {
       console.error('Error updating stats:', error);
-    }
-  }
-
-  private isVulnersSite(url: string): boolean {
-    try {
-      const hostname = new URL(url).hostname.toLowerCase();
-      return (
-        hostname === 'vulners.com' ||
-        hostname.endsWith('.vulners.com') ||
-        hostname === 'www.vulners.com'
-      );
-    } catch {
-      return false;
     }
   }
 
@@ -113,6 +122,15 @@ class PopupController {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  new PopupController();
-});
+// Initialize the controller only in browser context (not during Jest tests)
+if (typeof document !== 'undefined' && typeof jest === 'undefined') {
+  document.addEventListener('DOMContentLoaded', () => {
+    new PopupController();
+  });
+}
+
+// Export for testing purposes
+export { PopupController };
+
+// Re-export isVulnersSite for tests that import from popup
+export { isVulnersSite } from './utils';

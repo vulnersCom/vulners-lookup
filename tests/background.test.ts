@@ -495,9 +495,8 @@ describe('BackgroundService', () => {
             webApplicable: true,
           },
           classification: {
-            cwe: {
-              id: 'CWE-79',
-            },
+            cwes: ['CWE-79', 'CWE-89'],
+            cweCount: 2,
           },
           published: '2023-01-01',
           modified: '2023-01-15',
@@ -550,7 +549,8 @@ describe('BackgroundService', () => {
             twitterMentions: 150,
             webApplicable: true,
           },
-          cwe: 'CWE-79',
+          cwes: ['CWE-79', 'CWE-89'],
+          cweCount: 2,
           published: '2023-01-01',
           modified: '2023-01-15',
           status: 'Published',

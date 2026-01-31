@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Vulners Lookup",
-  "version": "1.0.3",
+  "version": "1.0.6",
   "description": "Automatically detect and highlight CVE IDs on web pages with vulnerability information from Vulners.com",
   "icons": {
     "16": "assets/icon-16.png",
@@ -16,6 +16,9 @@
     "https://vulners.com/*",
     "https://fonts.googleapis.com/*"
   ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; font-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com"
+  },
   "background": {
     "service_worker": "dist/background.js",
     "type": "module"
@@ -38,7 +41,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["assets/*", "dist/content.css"],
+      "resources": ["assets/*", "dist/content.css", "dist/history-hook.js"],
       "matches": ["<all_urls>"]
     }
   ]
