@@ -1,7 +1,7 @@
 # Vulners Lookup Extension Makefile
 
 # Variables
-VERSION := 1.0.3
+VERSION := 1.0.6
 EXTENSION_NAME := vulners-lookup
 BUILD_DIR := build
 DIST_DIR := dist

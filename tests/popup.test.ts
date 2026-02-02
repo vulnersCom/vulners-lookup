@@ -3,13 +3,13 @@
  */
 
 import { mockChrome } from './setup';
+import { PopupController, isVulnersSite } from '../src/popup';
 
-describe('Popup Interface', () => {
+describe('Popup Module', () => {
   beforeEach(() => {
-    // Clear all mocks
     jest.clearAllMocks();
 
-    // Set up basic popup HTML structure
+    // Set up the actual popup HTML structure matching popup.html
     document.body.innerHTML = `
       <div class="popup-container">
         <div class="header">
@@ -19,10 +19,10 @@ describe('Popup Interface', () => {
         <div class="content">
           <div class="toggle-section">
             <label class="toggle-switch">
-              <input type="checkbox" id="toggleHighlight">
+              <input type="checkbox" id="toggle-highlighting">
               <span class="slider"></span>
             </label>
-            <span id="status-text">Highlighting enabled</span>
+            <span id="status" class="stat-value">Active</span>
           </div>
           <div class="stats-section">
             <div class="stat-item">
@@ -36,209 +36,386 @@ describe('Popup Interface', () => {
         </div>
       </div>
     `;
+
+    // Default mocks
+    (mockChrome.storage.local.get as jest.Mock).mockResolvedValue({
+      enabled: true,
+    });
+    (mockChrome.tabs.query as jest.Mock).mockResolvedValue([
+      { id: 1, url: 'https://example.com' },
+    ]);
+    (mockChrome.tabs.sendMessage as jest.Mock).mockImplementation(
+      (_tabId, _message, callback) => {
+        if (callback) {
+          callback({
+            count: 5,
+            typeCounts: { cve: 3, advisory: 1, exploit: 1 },
+          });
+        }
+        return Promise.resolve();
+      }
+    );
   });
 
-  describe('Initialization', () => {
-    it('should query active tab on load', async () => {
-      (mockChrome.tabs.query as jest.Mock).mockResolvedValue([
-        { id: 1, url: 'https://example.com' },
-      ]);
+  // ============ isVulnersSite UTILITY TESTS ============
 
-      // Simulate popup initialization manually
-      const tabs = await mockChrome.tabs.query({
-        active: true,
-        currentWindow: true,
-      });
-
-      expect(mockChrome.tabs.query).toHaveBeenCalledWith({
-        active: true,
-        currentWindow: true,
-      });
-      expect(tabs).toHaveLength(1);
+  describe('isVulnersSite', () => {
+    it('should return true for vulners.com', () => {
+      expect(isVulnersSite('https://vulners.com')).toBe(true);
     });
 
-    it('should load stats from content script', async () => {
-      const mockTab = { id: 1, url: 'https://example.com' };
-      (mockChrome.tabs.query as jest.Mock).mockResolvedValue([mockTab]);
-      (mockChrome.tabs.sendMessage as jest.Mock).mockResolvedValue({
-        enabled: true,
-        count: 5,
+    it('should return true for www.vulners.com', () => {
+      expect(isVulnersSite('https://www.vulners.com')).toBe(true);
+    });
+
+    it('should return true for subdomains of vulners.com', () => {
+      expect(isVulnersSite('https://api.vulners.com')).toBe(true);
+      expect(isVulnersSite('https://subdomain.vulners.com')).toBe(true);
+    });
+
+    it('should be case insensitive', () => {
+      expect(isVulnersSite('https://VULNERS.COM')).toBe(true);
+      expect(isVulnersSite('https://Vulners.Com')).toBe(true);
+    });
+
+    it('should return false for non-vulners domains', () => {
+      expect(isVulnersSite('https://notvulners.com')).toBe(false);
+      expect(isVulnersSite('https://vulners.net')).toBe(false);
+      expect(isVulnersSite('https://example.com')).toBe(false);
+      expect(isVulnersSite('https://fakevulners.com')).toBe(false);
+    });
+
+    it('should return false for invalid URLs', () => {
+      expect(isVulnersSite('not-a-url')).toBe(false);
+      expect(isVulnersSite('')).toBe(false);
+    });
+  });
+
+  // ============ POPUP CONTROLLER TESTS ============
+
+  describe('PopupController', () => {
+    describe('Initialization', () => {
+      it('should initialize with correct elements', async () => {
+        new PopupController();
+
+        // Wait for async init
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        expect(mockChrome.storage.local.get).toHaveBeenCalledWith(['enabled']);
       });
 
-      // Simulate popup initialization
-      const tabs = await mockChrome.tabs.query({
-        active: true,
-        currentWindow: true,
-      });
-
-      if (tabs && tabs.length > 0 && tabs[0]) {
-        const response = await mockChrome.tabs.sendMessage(tabs[0].id, {
-          action: 'getStats',
+      it('should load settings from storage on init', async () => {
+        (mockChrome.storage.local.get as jest.Mock).mockResolvedValue({
+          enabled: true,
         });
 
-        // Update UI with response
-        const toggleInput = document.getElementById(
-          'toggleHighlight'
+        new PopupController();
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        const toggle = document.getElementById(
+          'toggle-highlighting'
         ) as HTMLInputElement;
-        const cveCount = document.getElementById('cve-count');
-        const statusText = document.getElementById('status-text');
-
-        if (toggleInput) {
-          toggleInput.checked = response.enabled;
-        }
-        if (cveCount) {
-          cveCount.textContent = response.count.toString();
-        }
-        if (statusText) {
-          statusText.textContent = response.enabled
-            ? 'Highlighting enabled'
-            : 'Highlighting disabled';
-        }
-      }
-
-      expect(mockChrome.tabs.sendMessage).toHaveBeenCalledWith(1, {
-        action: 'getStats',
-      });
-      expect(document.getElementById('cve-count')?.textContent).toBe('5');
-    });
-  });
-
-  describe('Toggle Functionality', () => {
-    it('should send toggle message when checkbox is clicked', async () => {
-      const mockTab = { id: 1, url: 'https://example.com' };
-      (mockChrome.tabs.query as jest.Mock).mockResolvedValue([mockTab]);
-      (mockChrome.tabs.sendMessage as jest.Mock).mockResolvedValue({
-        enabled: false,
+        expect(toggle.checked).toBe(true);
       });
 
-      const toggleInput = document.getElementById(
-        'toggleHighlight'
-      ) as HTMLInputElement;
+      it('should set toggle unchecked when disabled in settings', async () => {
+        (mockChrome.storage.local.get as jest.Mock).mockResolvedValue({
+          enabled: false,
+        });
 
-      // Simulate checkbox change
-      toggleInput.checked = false;
-      const changeEvent = new Event('change');
-      toggleInput.dispatchEvent(changeEvent);
+        new PopupController();
+        await new Promise((resolve) => setTimeout(resolve, 10));
 
-      // In real implementation, this would trigger sendMessage
-      const tabs = await mockChrome.tabs.query({
-        active: true,
-        currentWindow: true,
-      });
-      if (tabs && tabs[0]) {
-        await mockChrome.tabs.sendMessage(tabs[0].id, { action: 'toggle' });
-      }
-
-      expect(mockChrome.tabs.sendMessage).toHaveBeenCalledWith(1, {
-        action: 'toggle',
-      });
-    });
-
-    it('should update status text when toggled', () => {
-      const toggleInput = document.getElementById(
-        'toggleHighlight'
-      ) as HTMLInputElement;
-      const statusText = document.getElementById('status-text');
-
-      // Test enabling
-      toggleInput.checked = true;
-      if (statusText) {
-        statusText.textContent = 'Highlighting enabled';
-      }
-      expect(statusText?.textContent).toBe('Highlighting enabled');
-
-      // Test disabling
-      toggleInput.checked = false;
-      if (statusText) {
-        statusText.textContent = 'Highlighting disabled';
-      }
-      expect(statusText?.textContent).toBe('Highlighting disabled');
-    });
-  });
-
-  describe('Error Handling', () => {
-    it('should handle tabs.query errors', async () => {
-      (mockChrome.tabs.query as jest.Mock).mockRejectedValueOnce(
-        new Error('Permission denied')
-      );
-
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
-
-      try {
-        await mockChrome.tabs.query({ active: true, currentWindow: true });
-      } catch (error) {
-        console.error('Error querying tabs:', error);
-      }
-
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Error querying tabs:',
-        expect.any(Error)
-      );
-      consoleSpy.mockRestore();
-    });
-
-    it('should handle sendMessage errors gracefully', async () => {
-      const mockTab = { id: 1, url: 'https://example.com' };
-      (mockChrome.tabs.query as jest.Mock).mockResolvedValueOnce([mockTab]);
-      (mockChrome.tabs.sendMessage as jest.Mock).mockRejectedValueOnce(
-        new Error('Content script not loaded')
-      );
-
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
-
-      await mockChrome.tabs.query({ active: true, currentWindow: true });
-      const tabs = await mockChrome.tabs.query({
-        active: true,
-        currentWindow: true,
-      });
-
-      try {
-        if (tabs[0]) {
-          await mockChrome.tabs.sendMessage(tabs[0].id, { action: 'getStats' });
-        }
-      } catch (error) {
-        console.error('Error communicating with content script:', error);
-
-        // Set default values
-        const toggleInput = document.getElementById(
-          'toggleHighlight'
+        const toggle = document.getElementById(
+          'toggle-highlighting'
         ) as HTMLInputElement;
-        const cveCount = document.getElementById('cve-count');
-
-        if (toggleInput) {
-          toggleInput.checked = false;
-        }
-        if (cveCount) {
-          cveCount.textContent = '0';
-        }
-      }
-
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Error communicating with content script:',
-        expect.any(Error)
-      );
-      expect(document.getElementById('cve-count')?.textContent).toBe('0');
-
-      consoleSpy.mockRestore();
-    });
-
-    it('should handle missing active tab', async () => {
-      (mockChrome.tabs.query as jest.Mock).mockResolvedValue([]); // No active tabs
-
-      const tabs = await mockChrome.tabs.query({
-        active: true,
-        currentWindow: true,
+        expect(toggle.checked).toBe(false);
       });
 
-      expect(tabs).toHaveLength(0);
+      it('should query active tab on init', async () => {
+        new PopupController();
+        await new Promise((resolve) => setTimeout(resolve, 10));
 
-      // UI should remain in default state
-      const toggleInput = document.getElementById(
-        'toggleHighlight'
-      ) as HTMLInputElement;
-      expect(toggleInput).toBeTruthy();
+        expect(mockChrome.tabs.query).toHaveBeenCalledWith({
+          active: true,
+          currentWindow: true,
+        });
+      });
+    });
+
+    describe('loadSettings', () => {
+      it('should default to enabled when storage is empty', async () => {
+        (mockChrome.storage.local.get as jest.Mock).mockResolvedValue({});
+
+        new PopupController();
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        const toggle = document.getElementById(
+          'toggle-highlighting'
+        ) as HTMLInputElement;
+        // enabled !== false is true when enabled is undefined
+        expect(toggle.checked).toBe(true);
+      });
+    });
+
+    describe('updateStats', () => {
+      it('should display CVE count from content script', async () => {
+        (mockChrome.tabs.sendMessage as jest.Mock).mockImplementation(
+          (_tabId, _message, callback) => {
+            if (callback) {
+              callback({
+                count: 10,
+                typeCounts: { cve: 10, advisory: 0, exploit: 0 },
+              });
+            }
+            return Promise.resolve();
+          }
+        );
+
+        new PopupController();
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        const cveCount = document.getElementById('cve-count');
+        expect(cveCount?.textContent).toBe('10');
+      });
+
+      it('should display type breakdown when multiple types present', async () => {
+        (mockChrome.tabs.sendMessage as jest.Mock).mockImplementation(
+          (_tabId, _message, callback) => {
+            if (callback) {
+              callback({
+                count: 6,
+                typeCounts: { cve: 3, advisory: 2, exploit: 1 },
+              });
+            }
+            return Promise.resolve();
+          }
+        );
+
+        new PopupController();
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        const cveCount = document.getElementById('cve-count');
+        expect(cveCount?.textContent).toBe('3 CVE | 2 Adv | 1 Exp');
+      });
+
+      it('should display only CVE count when no other types', async () => {
+        (mockChrome.tabs.sendMessage as jest.Mock).mockImplementation(
+          (_tabId, _message, callback) => {
+            if (callback) {
+              callback({
+                count: 5,
+                typeCounts: { cve: 5, advisory: 0, exploit: 0 },
+              });
+            }
+            return Promise.resolve();
+          }
+        );
+
+        new PopupController();
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        const cveCount = document.getElementById('cve-count');
+        expect(cveCount?.textContent).toBe('5');
+      });
+    });
+
+    describe('updateStatus', () => {
+      it('should show Active status when enabled', async () => {
+        (mockChrome.storage.local.get as jest.Mock).mockResolvedValue({
+          enabled: true,
+        });
+
+        new PopupController();
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        const status = document.getElementById('status');
+        expect(status?.textContent).toBe('Active');
+        expect(status?.className).toContain('status-active');
+      });
+
+      it('should show Inactive status when disabled', async () => {
+        (mockChrome.storage.local.get as jest.Mock).mockResolvedValue({
+          enabled: false,
+        });
+
+        new PopupController();
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        const status = document.getElementById('status');
+        expect(status?.textContent).toBe('Inactive');
+        expect(status?.className).toContain('status-inactive');
+      });
+    });
+
+    describe('Vulners.com Detection', () => {
+      it('should disable extension on vulners.com', async () => {
+        (mockChrome.tabs.query as jest.Mock).mockResolvedValue([
+          { id: 1, url: 'https://vulners.com/cve/CVE-2024-1234' },
+        ]);
+
+        new PopupController();
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        const toggle = document.getElementById(
+          'toggle-highlighting'
+        ) as HTMLInputElement;
+        const status = document.getElementById('status');
+        const cveCount = document.getElementById('cve-count');
+
+        expect(toggle.disabled).toBe(true);
+        expect(toggle.checked).toBe(false);
+        expect(status?.textContent).toBe('Disabled on Vulners');
+        expect(cveCount?.textContent).toBe('—');
+      });
+
+      it('should disable on www.vulners.com', async () => {
+        (mockChrome.tabs.query as jest.Mock).mockResolvedValue([
+          { id: 1, url: 'https://www.vulners.com' },
+        ]);
+
+        new PopupController();
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        const toggle = document.getElementById(
+          'toggle-highlighting'
+        ) as HTMLInputElement;
+        expect(toggle.disabled).toBe(true);
+      });
+    });
+
+    describe('Toggle Event Handling', () => {
+      it('should save settings when toggle is changed', async () => {
+        new PopupController();
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        const toggle = document.getElementById(
+          'toggle-highlighting'
+        ) as HTMLInputElement;
+
+        toggle.checked = false;
+        toggle.dispatchEvent(new Event('change'));
+
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        expect(mockChrome.storage.local.set).toHaveBeenCalledWith({
+          enabled: false,
+        });
+      });
+
+      it('should send message to content script when toggled', async () => {
+        new PopupController();
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        // Clear previous calls
+        (mockChrome.tabs.sendMessage as jest.Mock).mockClear();
+
+        const toggle = document.getElementById(
+          'toggle-highlighting'
+        ) as HTMLInputElement;
+
+        toggle.checked = true;
+        toggle.dispatchEvent(new Event('change'));
+
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        expect(mockChrome.tabs.sendMessage).toHaveBeenCalledWith(1, {
+          action: 'toggleHighlighting',
+          enabled: true,
+        });
+      });
+
+      it('should clear badge when disabled', async () => {
+        new PopupController();
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        const toggle = document.getElementById(
+          'toggle-highlighting'
+        ) as HTMLInputElement;
+
+        toggle.checked = false;
+        toggle.dispatchEvent(new Event('change'));
+
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        expect(mockChrome.action.setBadgeText).toHaveBeenCalledWith({
+          text: '',
+        });
+      });
+
+      it('should set count to 0 when disabled', async () => {
+        new PopupController();
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        const toggle = document.getElementById(
+          'toggle-highlighting'
+        ) as HTMLInputElement;
+
+        toggle.checked = false;
+        toggle.dispatchEvent(new Event('change'));
+
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        const cveCount = document.getElementById('cve-count');
+        expect(cveCount?.textContent).toBe('0');
+      });
+
+      it('should not toggle on vulners.com', async () => {
+        (mockChrome.tabs.query as jest.Mock).mockResolvedValue([
+          { id: 1, url: 'https://vulners.com' },
+        ]);
+
+        new PopupController();
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        const toggle = document.getElementById(
+          'toggle-highlighting'
+        ) as HTMLInputElement;
+
+        // Try to enable
+        toggle.checked = true;
+        toggle.dispatchEvent(new Event('change'));
+
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        // Should have been reset to false
+        expect(toggle.checked).toBe(false);
+      });
+    });
+
+    describe('Error Handling', () => {
+      it('should handle missing tab id gracefully', async () => {
+        (mockChrome.tabs.query as jest.Mock).mockResolvedValue([
+          { url: 'https://example.com' }, // No id
+        ]);
+
+        // Should not throw
+        new PopupController();
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        // The controller should still initialize
+        const toggle = document.getElementById(
+          'toggle-highlighting'
+        ) as HTMLInputElement;
+        expect(toggle).toBeTruthy();
+      });
+
+      it('should handle no active tabs', async () => {
+        (mockChrome.tabs.query as jest.Mock).mockResolvedValue([]);
+
+        // Should not throw
+        new PopupController();
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        const toggle = document.getElementById(
+          'toggle-highlighting'
+        ) as HTMLInputElement;
+        expect(toggle).toBeTruthy();
+      });
     });
   });
+
+  // ============ UI ELEMENTS TESTS ============
 
   describe('UI Elements', () => {
     it('should have all required UI elements', () => {
@@ -248,8 +425,8 @@ describe('Popup Interface', () => {
         logo: document.querySelector('.logo'),
         title: document.querySelector('h1'),
         toggleSection: document.querySelector('.toggle-section'),
-        toggleInput: document.getElementById('toggleHighlight'),
-        statusText: document.getElementById('status-text'),
+        toggleInput: document.getElementById('toggle-highlighting'),
+        statusElement: document.getElementById('status'),
         statsSection: document.querySelector('.stats-section'),
         cveCount: document.getElementById('cve-count'),
         footer: document.querySelector('.footer'),
@@ -264,12 +441,10 @@ describe('Popup Interface', () => {
     it('should display logo correctly', () => {
       const logo = document.querySelector('.logo') as HTMLImageElement;
 
-      // Mock the return value explicitly
       (mockChrome.runtime.getURL as jest.Mock).mockReturnValue(
         'chrome-extension://test/assets/icon-48.png'
       );
 
-      // Set src using mockChrome.runtime.getURL
       const iconUrl = mockChrome.runtime.getURL('assets/icon-48.png');
       logo.src = iconUrl;
 
@@ -292,11 +467,12 @@ describe('Popup Interface', () => {
     });
   });
 
+  // ============ STATISTICS DISPLAY TESTS ============
+
   describe('Statistics Display', () => {
     it('should display CVE count correctly', () => {
       const cveCount = document.getElementById('cve-count');
 
-      // Test various counts
       const testCounts = [0, 1, 5, 10, 99, 100];
 
       testCounts.forEach((count) => {
@@ -307,27 +483,76 @@ describe('Popup Interface', () => {
       });
     });
 
-    it('should format large numbers appropriately', () => {
+    it('should format breakdown with only CVEs present', async () => {
+      (mockChrome.tabs.sendMessage as jest.Mock).mockImplementation(
+        (_tabId, _message, callback) => {
+          if (callback) {
+            callback({
+              count: 5,
+              typeCounts: { cve: 5, advisory: 0, exploit: 0 },
+            });
+          }
+          return Promise.resolve();
+        }
+      );
+
+      new PopupController();
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
       const cveCount = document.getElementById('cve-count');
+      // Should just show the number, not "5 CVE"
+      expect(cveCount?.textContent).toBe('5');
+    });
 
-      // Simulate large number formatting
-      const largeCount = 1000;
-      const formatted = largeCount > 999 ? '999+' : largeCount.toString();
+    it('should format breakdown with only advisories', async () => {
+      (mockChrome.tabs.sendMessage as jest.Mock).mockImplementation(
+        (_tabId, _message, callback) => {
+          if (callback) {
+            callback({
+              count: 3,
+              typeCounts: { cve: 0, advisory: 3, exploit: 0 },
+            });
+          }
+          return Promise.resolve();
+        }
+      );
 
-      if (cveCount) {
-        cveCount.textContent = formatted;
-      }
-      expect(cveCount?.textContent).toBe('999+');
+      new PopupController();
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      const cveCount = document.getElementById('cve-count');
+      expect(cveCount?.textContent).toBe('3 Adv');
+    });
+
+    it('should format breakdown with only exploits', async () => {
+      (mockChrome.tabs.sendMessage as jest.Mock).mockImplementation(
+        (_tabId, _message, callback) => {
+          if (callback) {
+            callback({
+              count: 2,
+              typeCounts: { cve: 0, advisory: 0, exploit: 2 },
+            });
+          }
+          return Promise.resolve();
+        }
+      );
+
+      new PopupController();
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      const cveCount = document.getElementById('cve-count');
+      expect(cveCount?.textContent).toBe('2 Exp');
     });
   });
+
+  // ============ ACCESSIBILITY TESTS ============
 
   describe('Accessibility', () => {
     it('should have proper ARIA labels', () => {
       const toggleInput = document.getElementById(
-        'toggleHighlight'
+        'toggle-highlighting'
       ) as HTMLInputElement;
 
-      // Add ARIA attributes
       toggleInput.setAttribute('aria-label', 'Toggle CVE highlighting');
       toggleInput.setAttribute('role', 'switch');
 
@@ -339,48 +564,11 @@ describe('Popup Interface', () => {
 
     it('should support keyboard navigation', () => {
       const toggleInput = document.getElementById(
-        'toggleHighlight'
+        'toggle-highlighting'
       ) as HTMLInputElement;
 
-      // Simulate keyboard event
-      const spaceEvent = new KeyboardEvent('keydown', { key: ' ' });
-      toggleInput.dispatchEvent(spaceEvent);
-
-      // Toggle should be focusable
       toggleInput.focus();
       expect(document.activeElement).toBe(toggleInput);
-    });
-  });
-
-  describe('Performance', () => {
-    it('should debounce rapid toggle changes', async () => {
-      jest.useFakeTimers();
-
-      const mockTab = { id: 1, url: 'https://example.com' };
-      (mockChrome.tabs.query as jest.Mock).mockResolvedValue([mockTab]);
-      (mockChrome.tabs.sendMessage as jest.Mock).mockResolvedValue({
-        enabled: true,
-      });
-
-      const toggleInput = document.getElementById(
-        'toggleHighlight'
-      ) as HTMLInputElement;
-
-      // Simulate rapid toggles
-      for (let i = 0; i < 10; i++) {
-        toggleInput.checked = !toggleInput.checked;
-        const changeEvent = new Event('change');
-        toggleInput.dispatchEvent(changeEvent);
-      }
-
-      // In real implementation with debounce
-      jest.advanceTimersByTime(300);
-
-      // Should only send message once after debounce
-      // This is a conceptual test - actual implementation would need debounce logic
-      expect(mockChrome.tabs.sendMessage).toHaveBeenCalledTimes(0); // Not called yet in our mock
-
-      jest.useRealTimers();
     });
   });
 });

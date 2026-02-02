@@ -1,66 +1,23 @@
-// Types and Interfaces
-interface CachedCVEData {
-  data: CVEData;
-  timestamp: number;
-}
-
-interface CVEData {
-  id: string;
-  description: string;
-  shortDescription?: string;
-  isCandidate?: boolean;
-  cvss?: {
-    score: number;
-    vector: string;
-  };
-  cvss4?: {
-    score: number;
-    vector: string;
-  };
-  epss?: {
-    score: number;
-    percentile: number;
-  };
-  published?: string;
-  modified?: string;
-  status: string;
-  cwe?: string;
-  exploitInfo?: {
-    maxMaturity: string;
-    exploits: number;
-    available: string;
-    wildExploited: boolean;
-  };
-  vulnerabilityIntelligence?: {
-    score: number;
-    uncertainty: number;
-    twitterMentions: number;
-    webApplicable: boolean;
-  };
-  sources: string[];
-}
-
-interface MessageRequest {
-  action: 'fetchCVEData' | 'fetchPatterns' | 'updateBadge';
-  cveId?: string;
-  count?: number;
-}
-
-interface PatternsResponse {
-  patterns: string[] | null;
-}
-
-interface CVEResponse {
-  data: CVEData;
-}
+import {
+  CVEData,
+  CachedCVEData,
+  MessageRequest,
+  PatternsResponse,
+  CVEResponse,
+  VulnersAPIResponse,
+} from './types';
+import {
+  VULNERS_HOST,
+  VULNERS_CVE_API_PATH,
+  VULNERS_PATTERNS_API_PATH,
+  CACHE_EXPIRY_MS,
+  MAX_RETRIES,
+  FETCH_TIMEOUT_MS,
+  BADGE_BACKGROUND_COLOR,
+  BADGE_TEXT_COLOR,
+} from './constants';
 
 class BackgroundService {
-  private readonly VULNERS_HOST = 'https://vulners.com' as const;
-  private readonly VULNERS_CVE_API_PATH = '/api/misc/chrome/cve' as const;
-  private readonly VULNERS_PATTERNS_API_PATH =
-    '/api/misc/chrome/patterns' as const;
-  private readonly CACHE_EXPIRY_MS = 3600000 as const; // 1 hour
-  private readonly MAX_RETRIES = 3 as const;
   private readonly cveCache = new Map<string, CachedCVEData>();
 
   constructor() {
@@ -73,14 +30,20 @@ class BackgroundService {
       (
         request: MessageRequest,
         sender: chrome.runtime.MessageSender,
-        sendResponse: (response: any) => void
+        sendResponse: (
+          response:
+            | CVEResponse
+            | PatternsResponse
+            | { error: string }
+            | undefined
+        ) => void
       ): boolean | undefined => {
         switch (request.action) {
           case 'fetchCVEData':
             if (request.cveId) {
               this.fetchCVEData(request.cveId)
                 .then(sendResponse)
-                .catch((error) => {
+                .catch((error: Error) => {
                   console.error('Error in fetchCVEData:', error);
                   sendResponse({ error: error.message });
                 });
@@ -91,7 +54,7 @@ class BackgroundService {
           case 'fetchPatterns':
             this.fetchPatterns()
               .then(sendResponse)
-              .catch((error) => {
+              .catch((error: Error) => {
                 console.error('Error in fetchPatterns:', error);
                 sendResponse({ patterns: null });
               });
@@ -104,7 +67,10 @@ class BackgroundService {
             break;
 
           default:
-            console.warn('Unknown action:', request.action);
+            console.warn(
+              'Unknown action:',
+              (request as { action: string }).action
+            );
         }
         return undefined;
       }
@@ -114,8 +80,10 @@ class BackgroundService {
   private async setupBadgeDefaults(): Promise<void> {
     try {
       await Promise.all([
-        chrome.action.setBadgeBackgroundColor({ color: '#6366f1' }),
-        chrome.action.setBadgeTextColor({ color: '#ffffff' }),
+        chrome.action.setBadgeBackgroundColor({
+          color: BADGE_BACKGROUND_COLOR,
+        }),
+        chrome.action.setBadgeTextColor({ color: BADGE_TEXT_COLOR }),
       ]);
     } catch (error) {
       console.error('Failed to setup badge defaults:', error);
@@ -125,14 +93,14 @@ class BackgroundService {
   private async fetchPatterns(): Promise<PatternsResponse> {
     try {
       const response = await this.fetchWithRetry(
-        `${this.VULNERS_HOST}${this.VULNERS_PATTERNS_API_PATH}`,
+        `${VULNERS_HOST}${VULNERS_PATTERNS_API_PATH}`,
         {
           method: 'GET',
           headers: {
             Accept: 'application/json',
           },
         },
-        this.MAX_RETRIES
+        MAX_RETRIES
       );
 
       if (response?.ok) {
@@ -154,7 +122,7 @@ class BackgroundService {
   private async fetchCVEData(cveId: string): Promise<CVEResponse> {
     // Check cache with expiration
     const cached = this.cveCache.get(cveId);
-    if (cached && Date.now() - cached.timestamp < this.CACHE_EXPIRY_MS) {
+    if (cached && Date.now() - cached.timestamp < CACHE_EXPIRY_MS) {
       return { data: cached.data };
     }
 
@@ -194,13 +162,20 @@ class BackgroundService {
   private async fetchWithRetry(
     url: string,
     options: RequestInit,
-    maxRetries: number = this.MAX_RETRIES
+    maxRetries: number = MAX_RETRIES
   ): Promise<Response> {
     let lastError: Error | null = null;
 
     for (let i = 0; i < maxRetries; i++) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
       try {
-        const response = await fetch(url, options);
+        const response = await fetch(url, {
+          ...options,
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
 
         // If successful or client error (4xx), return immediately
         if (response.ok || (response.status >= 400 && response.status < 500)) {
@@ -225,10 +200,22 @@ class BackgroundService {
 
         return response;
       } catch (error) {
-        lastError = error as Error;
-        console.warn(`Retry ${i + 1}/${maxRetries} for network error:`, error);
+        clearTimeout(timeoutId);
 
-        // Exponential backoff for network errors
+        if (error instanceof Error && error.name === 'AbortError') {
+          lastError = new Error(`Request timeout after ${FETCH_TIMEOUT_MS}ms`);
+          console.warn(
+            `Fetch timeout (attempt ${i + 1}/${maxRetries}): ${url}`
+          );
+        } else {
+          lastError = error as Error;
+          console.warn(
+            `Retry ${i + 1}/${maxRetries} for network error:`,
+            error
+          );
+        }
+
+        // Exponential backoff for network errors and timeouts
         if (i < maxRetries - 1) {
           await new Promise((resolve) =>
             setTimeout(resolve, Math.pow(2, i) * 1000)
@@ -243,7 +230,7 @@ class BackgroundService {
   private async fetchFromAPI(cveId: string): Promise<CVEData | null> {
     try {
       const response = await this.fetchWithRetry(
-        `${this.VULNERS_HOST}${this.VULNERS_CVE_API_PATH}`,
+        `${VULNERS_HOST}${VULNERS_CVE_API_PATH}`,
         {
           method: 'POST',
           headers: {
@@ -253,7 +240,7 @@ class BackgroundService {
             cveId: cveId.toUpperCase(),
           }),
         },
-        this.MAX_RETRIES
+        MAX_RETRIES
       );
 
       if (!response.ok) {
@@ -261,7 +248,7 @@ class BackgroundService {
         return null;
       }
 
-      const result = await response.json();
+      const result = (await response.json()) as { result?: VulnersAPIResponse };
 
       if (result.result) {
         const processedData = this.processVulnersData(cveId, result.result);
@@ -276,7 +263,7 @@ class BackgroundService {
     }
   }
 
-  private processVulnersData(cveId: string, doc: any): CVEData {
+  private processVulnersData(cveId: string, doc: VulnersAPIResponse): CVEData {
     // Handle new beta API format (pre-processed)
     if (doc.cacheExpiry || doc.severity || doc.exploitation) {
       return {
@@ -305,7 +292,8 @@ class BackgroundService {
         published: doc.published,
         modified: doc.modified,
         status: doc.status || 'Published',
-        cwe: doc.classification?.cwe?.id || undefined,
+        cwes: doc.classification?.cwes || [],
+        cweCount: doc.classification?.cweCount || 0,
         exploitInfo: doc.exploitation
           ? {
               maxMaturity: doc.exploitation.maxMaturity,
@@ -323,6 +311,19 @@ class BackgroundService {
             }
           : undefined,
         sources: doc.sources || ['vulners.com'],
+        // Advisory-specific fields
+        linkedCVEs: doc.linkedCves || undefined,
+        linkedCVECount: doc.linkedCveCount || undefined,
+        vendor: doc.vendor || undefined,
+        // Exploit-specific fields
+        relatedCVEs: doc.relatedCves || undefined,
+        relatedCVECount: doc.relatedCveCount || undefined,
+        repoUrl: doc.repoUrl || undefined,
+        platform: doc.platform || undefined,
+        maturity: doc.maturity || undefined,
+        exploitType: doc.exploitType || undefined,
+        verified: doc.verified,
+        author: doc.author || undefined,
       };
     }
 
